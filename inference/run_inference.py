@@ -1,4 +1,4 @@
-"""Run LeviDigit 3D segmentation and BV/TV analysis."""
+"""Run LeviDigit segmentation, measurements, and publication visualizations."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from levidigit.paths import discover_nifti_images
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Segment digit micro-CT NIfTI volumes and calculate BV/TV."
+        description="Segment digit micro-CT volumes and calculate BV/TV and digit length."
     )
     parser.add_argument(
         "--input-dir", required=True, type=Path,
@@ -36,6 +36,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--bone-threshold", required=True, type=float,
         help="Inclusive 0-255 image-intensity threshold used to define bone volume.",
+    )
+    parser.add_argument(
+        "--no-figures", action="store_true",
+        help="Write measurements and NIfTI artifacts without PNG/TIFF figures.",
+    )
+    parser.add_argument(
+        "--figure-dpi", type=int, default=300,
+        help="PNG/TIFF resolution (default: 300).",
     )
     return parser.parse_args()
 
@@ -81,7 +89,8 @@ def main() -> int:
         "model_source": str(model_path),
         "bone_threshold": threshold,
         "threshold_rule": "image intensity >= bone_threshold inside predicted mask",
-        "digit_length_status": "reserved for phase two; not calculated",
+        "digit_length_method": "largest concavity centroid to most distant ROI point; count only in-ROI line intervals",
+        "figures_requested": not args.no_figures,
         "cases": sorted(cases),
     }
     if model_path.is_file():
@@ -107,13 +116,16 @@ def main() -> int:
             mask_dir=masks_dir,
             bone_threshold=threshold,
             output_csv=output_dir / "measurements.csv",
+            make_figures=not args.no_figures,
+            figure_dpi=args.figure_dpi,
         )
         manifest["num_predictions"] = len(observed)
         manifest["num_measurements"] = len(rows)
         manifest["status"] = "complete"
         status = "complete"
         print(f"Measurements: {output_dir / 'measurements.csv'}", flush=True)
-        print("Digit length is reserved for phase two and is blank in the CSV.", flush=True)
+        complete = sum(row["digit_length_status"] == "complete" for row in rows)
+        print(f"Digit lengths complete: {complete}/{len(rows)}", flush=True)
         return 0
     except Exception as error:
         manifest["error"] = str(error)

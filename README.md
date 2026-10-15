@@ -1,6 +1,6 @@
 # LeviDigit
 
-LeviDigit segments animal digit micro-CT volumes with a five-fold 3D nnU-Net model and reports bone volume (BV), total segmented volume (TV), and BV/TV. Inputs are 8-bit NIfTI volumes with 0.004 mm isotropic spacing. Digit-length analysis is reserved for a later phase and is not currently calculated.
+LeviDigit segments animal digit micro-CT volumes with a five-fold 3D nnU-Net model and reports bone volume (BV), total segmented volume (TV), BV/TV, and digit length. Inputs are 8-bit NIfTI volumes with 0.004 mm isotropic spacing. Postprocessing also exports quantitative masks, audit landmarks, and publication-oriented 2D/3D figures.
 
 ## Install
 
@@ -28,7 +28,7 @@ python tools\bmp_stack_to_nifti.py `
 
 Each case is written as `<case>_0000.nii.gz`. Slice dimensions must agree; the converter never pads or resizes data.
 
-## Run inference and BV/TV
+## Run inference and measurements
 
 Place one NIfTI volume per case directly in a local input folder and choose the inclusive 0-255 bone threshold:
 
@@ -43,14 +43,25 @@ The pipeline automatically uses CUDA when available and otherwise uses CPU. It c
 
 ```text
 masks/<case>.nii.gz
+derived_masks/bv/<case>.nii.gz
+derived_masks/concavity/<case>.nii.gz
+derived_masks/digit_length_counted/<case>.nii.gz
+visualization_labelmaps/standard/<case>.nii.gz
+visualization_labelmaps/audit/<case>.nii.gz
+landmarks/<case>.json
+figures/2d/<case>_2d_{standard,audit}.{png,tiff}
+figures/3d/<case>_3d_{standard,audit}.{png,tiff}
 measurements.csv
 measurements.json
+label_definitions.json
 run_manifest.json
 ```
 
-`measurements.csv` contains BV and TV in voxels and mm³, BV/TV percent, and a blank `digit_length_um` column reserved for the future length analysis.
+`measurements.csv` contains one row per sample. Volumes are reported in voxels and mm³, BV/TV as percent, digit length in mm and µm, and landmark coordinates in voxel and NIfTI world coordinates. A failed concavity/length calculation remains a clearly marked row rather than being silently reported as zero.
 
-## Re-run BV/TV only
+The combined labelmaps are visualization products, not quantitative masks. `label_definitions.json` records their label values and colors. The independent binary masks under `derived_masks/` are authoritative for analysis. The original binary nnU-Net ROI remains unchanged under `masks/`.
+
+## Re-run postprocessing only
 
 Changing the threshold does not require another segmentation run:
 
