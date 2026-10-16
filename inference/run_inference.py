@@ -34,6 +34,13 @@ def parse_args() -> argparse.Namespace:
         help="Downloaded LeviDigit model .zip or extracted model folder.",
     )
     parser.add_argument(
+        "--scratch-dir", type=Path,
+        help=(
+            "Optional local workspace. Inputs and the model are staged here, results are "
+            "copied back beside the input directory, and this run's scratch folder is removed."
+        ),
+    )
+    parser.add_argument(
         "--bone-threshold", required=True, type=float,
         help="Inclusive 0-255 image-intensity threshold used to define bone volume.",
     )
@@ -60,6 +67,17 @@ def new_output_dir(input_dir: Path) -> Path:
     return output
 
 
+def new_work_dir(scratch_dir: Path, run_name: str) -> Path:
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    work_dir = scratch_dir / f"{run_name}_work"
+    sequence = 1
+    while work_dir.exists():
+        work_dir = scratch_dir / f"{run_name}_work_{sequence:02d}"
+        sequence += 1
+    work_dir.mkdir()
+    return work_dir
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -75,17 +93,24 @@ def main() -> int:
     model_path = args.model.expanduser().resolve()
     cases = discover_nifti_images(input_dir)
     output_dir = new_output_dir(input_dir)
-    staged_input = output_dir / "_nnunet_input"
-    model_extract = output_dir / "_model_extract"
-    masks_dir = output_dir / "masks"
+    scratch_dir = args.scratch_dir.expanduser().resolve() if args.scratch_dir else None
+    work_root = new_work_dir(scratch_dir, output_dir.name) if scratch_dir else output_dir
+    work_output = work_root / "output" if scratch_dir else output_dir
+    work_output.mkdir(exist_ok=True)
+    staged_input = work_root / "_nnunet_input"
+    model_extract = work_root / "_model_extract"
+    masks_dir = work_output / "masks"
 
     print(f"Cases: {len(cases)}", flush=True)
     print(f"Output: {output_dir}", flush=True)
+    if scratch_dir:
+        print(f"Scratch workspace: {work_root}", flush=True)
     status = "failed"
     manifest: dict[str, object] = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "status": status,
         "input_dir": str(input_dir),
+        "scratch_dir": str(scratch_dir) if scratch_dir else None,
         "model_source": str(model_path),
         "bone_threshold": threshold,
         "threshold_rule": "image intensity >= bone_threshold inside predicted mask",
@@ -112,10 +137,10 @@ def main() -> int:
             raise RuntimeError(f"Prediction set mismatch; missing={missing}, extra={extra}")
 
         rows = analyze_bvtv(
-            input_dir=input_dir,
+            input_dir=staged_input,
             mask_dir=masks_dir,
             bone_threshold=threshold,
-            output_csv=output_dir / "measurements.csv",
+            output_csv=work_output / "measurements.csv",
             make_figures=not args.no_figures,
             figure_dpi=args.figure_dpi,
         )
@@ -133,12 +158,21 @@ def main() -> int:
     finally:
         manifest["finished_utc"] = datetime.now(timezone.utc).isoformat()
         manifest["status"] = status
-        (output_dir / "run_manifest.json").write_text(
+        (work_output / "run_manifest.json").write_text(
             json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
         )
-        for temporary in (staged_input, model_extract):
-            if temporary.exists():
-                shutil.rmtree(temporary)
+        if scratch_dir:
+            exported = False
+            try:
+                shutil.copytree(work_output, output_dir, dirs_exist_ok=True)
+                exported = True
+            finally:
+                if exported:
+                    shutil.rmtree(work_root)
+        else:
+            for temporary in (staged_input, model_extract):
+                if temporary.exists():
+                    shutil.rmtree(temporary)
 
 
 if __name__ == "__main__":

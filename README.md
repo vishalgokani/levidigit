@@ -13,7 +13,7 @@ conda activate levidigit
 pip install -r requirements.txt
 ```
 
-The model weights are distributed separately. Contact the authors for access, download `levidigit_nnunet_model.zip`, and keep it outside this Git repository.
+The model weights are distributed separately through the project OneDrive. Download `levidigit_nnunet_model.zip`, keep it outside this Git repository, and pass its local path to `--model`. This model is not distributed through Hugging Face.
 
 ## Prepare BMP stacks
 
@@ -36,6 +36,7 @@ Place one NIfTI volume per case directly in a local input folder and choose the 
 python inference\run_inference.py `
   --input-dir "<NIFTI_INPUT_DIR>" `
   --model "<PATH_TO_MODEL_ZIP_OR_EXTRACTED_FOLDER>" `
+  --scratch-dir "<LOCAL_SCRATCH_DIR>" `
   --bone-threshold 60
 ```
 
@@ -49,8 +50,7 @@ derived_masks/digit_length_counted/<case>.nii.gz
 visualization_labelmaps/standard/<case>.nii.gz
 visualization_labelmaps/audit/<case>.nii.gz
 landmarks/<case>.json
-figures/2d/<case>_2d_{standard,audit}.{png,tiff}
-figures/3d/<case>_3d_{standard,audit}.{png,tiff}
+figures/<case>_publication.{png,tiff}
 measurements.csv
 measurements.json
 label_definitions.json
@@ -59,7 +59,7 @@ run_manifest.json
 
 `measurements.csv` contains one row per sample. Volumes are reported in voxels and mm³, BV/TV as percent, digit length in mm and µm, and landmark coordinates in voxel and NIfTI world coordinates. A failed concavity/length calculation remains a clearly marked row rather than being silently reported as zero.
 
-The combined labelmaps are visualization products, not quantitative masks. `label_definitions.json` records their label values and colors. The independent binary masks under `derived_masks/` are authoritative for analysis. The original binary nnU-Net ROI remains unchanged under `masks/`.
+The combined labelmaps are visualization products, not quantitative masks. `label_definitions.json` records their label values and colors. The independent binary masks under `derived_masks/` are authoritative for analysis. The original binary nnU-Net ROI remains unchanged under `masks/`. When `--scratch-dir` is supplied, inference and postprocessing run in a unique local workspace, the completed timestamped output is copied back beside the input directory, and that run's scratch workspace is removed after a successful export.
 
 ## Re-run postprocessing only
 
