@@ -4,13 +4,13 @@ LeviDigit segments animal digit micro-CT volumes with a five-fold 3D nnU-Net mod
 
 ## Install
 
-Create an environment and install a PyTorch build compatible with the workstation's CUDA version. Then install the remaining packages:
+Create an environment and install the required packages:
 
 ```powershell
 conda create -n levidigit python=3.12 -y
 conda activate levidigit
-# Install the appropriate PyTorch build first.
 pip install -r requirements.txt
+# Then install the CUDA-enabled PyTorch build appropriate for your NVIDIA GPU and driver.
 ```
 
 The model weights are distributed separately through the project OneDrive. Download `levidigit_nnunet_model.zip`, keep it outside this Git repository, and pass its local path to `--model`. This model is not distributed through Hugging Face.

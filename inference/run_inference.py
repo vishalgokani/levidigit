@@ -162,13 +162,15 @@ def main() -> int:
             json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
         )
         if scratch_dir:
-            exported = False
-            try:
-                shutil.copytree(work_output, output_dir, dirs_exist_ok=True)
-                exported = True
-            finally:
-                if exported:
-                    shutil.rmtree(work_root)
+            shutil.copytree(work_output, output_dir, dirs_exist_ok=True)
+            if status == "complete":
+                shutil.rmtree(work_root)
+            else:
+                print(
+                    f"Run failed; scratch workspace preserved for diagnosis: {work_root}",
+                    file=sys.stderr,
+                    flush=True,
+                )
         else:
             for temporary in (staged_input, model_extract):
                 if temporary.exists():
